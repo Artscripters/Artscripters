@@ -1,0 +1,710 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Art Scripters</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one left-aligned column. Header with actions, a quest pager, then a single quest card whose bottom panel is a vault that flips from locked to open. Edit controls only appear for the owner. */
+:root {
+  --bg: #EDEFF6;
+  --surface: #FBFBFE;
+  --surface-2: #E4E7F2;
+  --fg: #12162B;
+  --muted: #565C7C;
+  --line: #CDD2E4;
+  --accent: #2F3CF2;
+  --accent-fg: #FFFFFF;
+  --hi: #C9F23A;
+  --hi-fg: #12162B;
+  --danger: #B3261E;
+  --font-display: "Bricolage Grotesque", "Trebuchet MS", system-ui, sans-serif;
+  --font-body: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1120;
+    --surface: #171B30;
+    --surface-2: #20253F;
+    --fg: #E9EBF7;
+    --muted: #9AA0C2;
+    --line: #2C3254;
+    --accent: #8E99FF;
+    --accent-fg: #0E1120;
+    --hi: #C9F23A;
+    --hi-fg: #12162B;
+    --danger: #FF8A80;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1120;
+  --surface: #171B30;
+  --surface-2: #20253F;
+  --fg: #E9EBF7;
+  --muted: #9AA0C2;
+  --line: #2C3254;
+  --accent: #8E99FF;
+  --accent-fg: #0E1120;
+  --hi: #C9F23A;
+  --hi-fg: #12162B;
+  --danger: #FF8A80;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+img { max-width: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  padding-inline: 16px;
+  padding-block: 24px 48px;
+}
+.wrap { max-width: 680px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; }
+
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.muted { color: var(--muted); margin: 0; }
+
+/* header */
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.brand { font-family: var(--font-mono); font-size: 13px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.actions { display: flex; gap: 8px; }
+.chip {
+  border: 1px solid var(--line); background: var(--surface); border-radius: 999px;
+  padding: 7px 14px; font-size: 14px; font-weight: 500; min-height: 36px;
+}
+.chip:hover { border-color: var(--accent); }
+.chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+
+h1 {
+  font-family: var(--font-display); font-weight: 700; font-size: clamp(34px, 8vw, 54px);
+  line-height: 1.02; letter-spacing: -0.02em; margin: 0; text-wrap: balance;
+}
+.lead { margin: 12px 0 0; color: var(--muted); max-width: 56ch; }
+
+/* pager */
+.pager { display: flex; align-items: center; gap: 10px; }
+.sq {
+  width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--line);
+  background: var(--surface); display: grid; place-items: center; font-size: 22px; line-height: 1; flex: none;
+}
+.sq:hover:not(:disabled) { border-color: var(--accent); }
+.sq:disabled { opacity: 0.35; cursor: not-allowed; }
+.sq.add { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-size: 26px; }
+.pos { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 13px; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; min-height: 32px; }
+.dots { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.dot { width: 18px; height: 6px; border-radius: 3px; background: var(--line); }
+.dot.here { background: var(--accent); }
+.dot.done { background: var(--hi); }
+.dot.here.done { background: var(--hi); outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* quest card */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 22px 20px; display: flex; flex-direction: column; gap: 20px; }
+.card h2 { font-family: var(--font-display); font-size: clamp(24px, 5vw, 30px); line-height: 1.1; letter-spacing: -0.01em; margin: 0; text-wrap: balance; overflow-wrap: anywhere; }
+.progress { display: flex; align-items: center; gap: 12px; }
+.segs { flex: 1; display: flex; gap: 4px; min-width: 0; }
+.seg { flex: 1; height: 8px; border-radius: 4px; background: var(--surface-2); transition: background 0.2s; }
+.seg.on { background: var(--accent); }
+.count { font-family: var(--font-mono); font-size: 13px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.step label {
+  display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border-radius: 12px;
+  border: 1px solid var(--line); cursor: pointer; background: var(--bg);
+}
+.step label:hover { border-color: var(--accent); }
+.step input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.box {
+  width: 24px; height: 24px; border-radius: 7px; border: 2px solid var(--muted); flex: none; margin-top: 1px;
+  display: grid; place-items: center; background: transparent;
+}
+.box svg { width: 14px; height: 14px; opacity: 0; }
+.step input:checked + .box { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.step input:checked + .box svg { opacity: 1; }
+.step input:focus-visible + .box { outline: 3px solid var(--accent); outline-offset: 2px; }
+.step .txt { min-width: 0; overflow-wrap: anywhere; }
+.step input:checked ~ .txt { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
+
+/* link steps */
+.step.link .row-step { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); }
+.step.link.done .row-step { border-color: var(--accent); }
+.step-main { display: flex; gap: 12px; align-items: flex-start; flex: 1 1 220px; min-width: 0; }
+.step-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.step.link.done .txt { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
+.box.on { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.box.on svg { opacity: 1; }
+.hint { font-size: 13px; color: var(--muted); }
+.go {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 8px 16px; border-radius: 10px;
+  background: var(--accent); color: var(--accent-fg); font-weight: 600; font-size: 15px; text-decoration: none; white-space: nowrap; align-self: center;
+}
+.go:hover { filter: brightness(1.12); }
+.badge { align-self: center; font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+.note {
+  margin: 8px 2px 0; padding: 10px 12px; border-radius: 10px; font-size: 14px; font-weight: 500;
+  background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger);
+}
+.sedit { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
+
+/* vault */
+.vault { border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+.vault.locked { border: 2px dashed var(--line); background: var(--bg); }
+.vault.open { background: var(--hi); color: var(--hi-fg); }
+.vault-head { display: flex; gap: 12px; align-items: center; }
+.vault-head svg { width: 28px; height: 28px; flex: none; }
+.vault-title { font-family: var(--font-display); font-weight: 700; font-size: 20px; line-height: 1.15; margin: 0; }
+.vault-sub { margin: 2px 0 0; font-size: 14px; }
+.locked .vault-sub { color: var(--muted); }
+.cta {
+  border: 0; border-radius: 12px; padding: 14px 20px; min-height: 52px; font-weight: 600; font-size: 17px; align-self: flex-start;
+  background: var(--hi-fg); color: var(--hi);
+}
+.cta:hover { filter: brightness(1.2); }
+a.cta { display: inline-flex; align-items: center; text-decoration: none; }
+.cta[disabled] { background: var(--surface-2); color: var(--muted); cursor: not-allowed; filter: none; }
+.fake { display: flex; flex-direction: column; gap: 7px; }
+.fake i { display: block; height: 9px; border-radius: 5px; background: var(--surface-2); }
+.fake i:nth-child(1) { width: 72%; } .fake i:nth-child(2) { width: 54%; margin-left: 5%; } .fake i:nth-child(3) { width: 63%; margin-left: 5%; } .fake i:nth-child(4) { width: 38%; }
+pre.script {
+  margin: 0; padding: 14px; border-radius: 10px; background: #12162B; color: #E9EBF7;
+  font-family: var(--font-mono); font-size: 13px; line-height: 1.55; overflow-x: auto; max-width: 100%; tab-size: 4;
+}
+
+/* owner edit mode */
+.edit { display: flex; flex-direction: column; gap: 16px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field > .lab, .legend { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+input[type="text"], input[type="password"], textarea {
+  font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px 12px; width: 100%; min-width: 0;
+}
+textarea { font-family: var(--font-mono); font-size: 13px; line-height: 1.5; min-height: 170px; resize: vertical; }
+.row { display: flex; gap: 8px; align-items: center; }
+.row input { flex: 1; }
+.mini { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; min-width: 40px; min-height: 40px; font-size: 18px; flex: none; }
+.mini:hover { border-color: var(--danger); color: var(--danger); }
+.btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 10px 14px; font-weight: 500; min-height: 42px; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
+.btn[disabled] { opacity: 0.6; cursor: wait; }
+.btn.danger { color: var(--danger); }
+.btn.danger.arm { background: var(--danger); color: var(--surface); border-color: var(--danger); }
+.unsaved {
+  display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap;
+  padding: 10px 14px; border-radius: 12px; background: var(--hi); color: var(--hi-fg); font-weight: 500; font-size: 14px; margin-bottom: 16px;
+}
+.unsaved .btn { color: var(--fg); }
+
+.toast {
+  position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 20px);
+  background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 14px; font-weight: 500;
+  opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s; max-width: calc(100% - 32px);
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+@media (prefers-reduced-motion: reduce) { .seg, .toast { transition: none; } }
+@media (max-width: 420px) { .card { padding: 18px 14px; } }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <span class="brand">Art Scripters</span>
+    <div class="actions">
+      <button class="chip" id="copyLink" type="button">Copy Link</button>
+      <button class="chip" id="editBtn" type="button" aria-pressed="false" hidden>Edit</button>
+    </div>
+  </div>
+
+  <header>
+    <h1>Finish every step, unlock the script</h1>
+    <p class="lead" id="lead">Every quest is its own page. Complete both steps to unlock the script, then use the arrows to move to the next quest.</p>
+  </header>
+
+  <nav class="pager" id="pagerNav" aria-label="Quests" hidden>
+    <button class="sq" id="prev" type="button" aria-label="Previous quest" disabled>&#8249;</button>
+    <div class="pos"><div id="posText"></div><div class="dots" id="dots"></div></div>
+    <button class="sq" id="next" type="button" aria-label="Next quest" disabled>&#8250;</button>
+    <button class="sq add" id="add" type="button" aria-label="Add a new quest" hidden>+</button>
+  </nav>
+
+  <main id="stage"><article class="card"><p class="muted">Loading quests...</p></article></main>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  var PKEY = 'art-scripters-progress-v1';   // each visitor's browser only remembers their own progress
+  var MIN_MS = 3000;                        // time a visitor must stay on a link
+  var state = { quests: [], i: 0 };
+  var status = 'loading';                   // loading | ready | failed
+  var editing = false, dirty = false, saving = false, armedDelete = false;
+  var isOwner = false, adminPw = '', adminHash = (location.hash === '#admin'), loginOpen = false, loginBusy = false;
+  var revealed = {}, notes = {}, pending = null, toastTimer;
+
+  function $(id) { return document.getElementById(id); }
+  var stage = $('stage'), prev = $('prev'), next = $('next'), posText = $('posText'), dotsEl = $('dots'),
+      toastEl = $('toast'), editBtn = $('editBtn'), addBtn = $('add');
+
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 2200);
+  }
+  function copy(text, ok, fail) {
+    function fb() {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0;';
+      document.body.appendChild(ta); ta.select();
+      var good = false;
+      try { good = document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(ta);
+      if (good) ok(); else fail();
+    }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(ok, fb);
+      else fb();
+    } catch (e) { fb(); }
+  }
+  function safeLink(v) {
+    v = String(v || '').trim();
+    if (!v) return '';
+    if (!/^https?:\/\//i.test(v)) {
+      if (/^[a-z][a-z0-9+.-]*:\/\//i.test(v)) return '';
+      v = 'https://' + v;
+    }
+    try {
+      var u = new URL(v);
+      return (u.protocol === 'http:' || u.protocol === 'https:') ? u.href : '';
+    } catch (e) { return ''; }
+  }
+  // Every quest has its own link: this page plus #quest-id. A visitor who opens it sees only that quest.
+  function hashIndex() {
+    var id = (location.hash || '').slice(1);
+    if (!id) return -1;
+    for (var k = 0; k < state.quests.length; k++) if (state.quests[k].id === id) return k;
+    return -1;
+  }
+  function questLongLink(q) { return q ? location.href.split('#')[0] + '#' + q.id : location.href; }
+  function questLink(q) { return (q && safeLink(q.short)) || questLongLink(q); }
+  function doneCount(q) { return q.steps.filter(function (s) { return s.d; }).length; }
+  function isDone(q) { return q.steps.length > 0 && doneCount(q) === q.steps.length; }
+  function newId() { return 'q' + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36); }
+  function blankQuest() {
+    return { id: newId(), title: 'New quest', steps: [{ t: 'Open the first link and stay on it', l: '', d: false }, { t: 'Open the second link and stay on it', l: '', d: false }], g: '', short: '', script: '-- Paste your script here' };
+  }
+
+  /* ---------- progress (per visitor) ---------- */
+  function readProgress() {
+    try {
+      var d = JSON.parse(localStorage.getItem(PKEY) || 'null');
+      if (d && typeof d === 'object') return d;
+    } catch (e) {}
+    return { i: 0, p: {} };
+  }
+  var progress = readProgress();
+  function saveProgress() {
+    var p = {};
+    state.quests.forEach(function (q) { p[q.id] = q.steps.map(function (s) { return s.d ? 1 : 0; }); });
+    progress = { i: state.i, p: p };
+    try { localStorage.setItem(PKEY, JSON.stringify(progress)); } catch (e) {}
+  }
+
+  /* ---------- content (content.json, saved by the owner) ---------- */
+  function str(v, max) { return typeof v === 'string' ? v.slice(0, max) : ''; }
+  function clean(d) {
+    var out = [];
+    if (d && Array.isArray(d.quests)) {
+      d.quests.forEach(function (q, n) {
+        if (!q) return;
+        var steps = (Array.isArray(q.steps) ? q.steps : []).slice(0, 2).map(function (s) {
+          return { t: str(s && s.t, 300), l: str(s && s.l, 500), d: false };
+        });
+        out.push({ id: str(q.id, 40).replace(/[^A-Za-z0-9._~-]/g, '') || 'q' + n, title: str(q.title, 200), steps: steps, g: str(q.g, 500), short: str(q.short, 500), script: str(q.script, 20000) });
+      });
+    }
+    return out;
+  }
+  function setContent(d) {
+    var qs = clean(d);
+    if (!qs.length) throw new Error('empty');
+    var pp = (progress && progress.p) || {};
+    qs.forEach(function (q) {
+      var row = pp[q.id] || [];
+      q.steps.forEach(function (s, k) { s.d = !!row[k]; });
+    });
+    state.quests = qs;
+    state.i = (typeof progress.i === 'number' && progress.i >= 0 && progress.i < qs.length) ? progress.i : 0;
+    status = 'ready';
+  }
+  function normalizeQuests() {
+    state.quests.forEach(function (q) {
+      q.steps = q.steps.filter(function (s) { return s.t.trim() !== ''; }).slice(0, 2);
+      if (!q.steps.length) q.steps.push({ t: 'Step 1', l: '', d: false });
+    });
+  }
+  function exportJson() {
+    return JSON.stringify({
+      quests: state.quests.map(function (q) {
+        return { id: q.id, title: q.title, steps: q.steps.map(function (s) { return { t: s.t, l: s.l || '' }; }), g: q.g || '', short: q.short || '', script: q.script || '' };
+      })
+    }, null, 2);
+  }
+  function verify(pw) {
+    return fetch('/api/content', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-admin-password': pw },
+      body: JSON.stringify({ action: 'check' })
+    }).then(function (r) {
+      if (!r.ok) return false;
+      isOwner = true; adminPw = pw;
+      try { sessionStorage.setItem('as-admin', pw); } catch (e) {}
+      return true;
+    }).catch(function () { return false; });
+  }
+  function logout() {
+    isOwner = false; adminPw = ''; editing = false; dirty = false;
+    try { sessionStorage.removeItem('as-admin'); } catch (e) {}
+  }
+  function saveContent() {
+    if (!isOwner || saving) return;
+    normalizeQuests();
+    saving = true; render();
+    fetch('/api/content', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-admin-password': adminPw },
+      body: JSON.stringify({ action: 'save', content: JSON.parse(exportJson()) })
+    }).then(function (r) {
+      if (r.status === 401) { logout(); throw { code: 'auth' }; }
+      if (!r.ok) throw { code: 'http' };
+      saving = false; dirty = false; saveProgress();
+      toast('Saved. Visitors will see the update'); render();
+    }).catch(function (err) {
+      saving = false;
+      toast(err && err.code === 'auth' ? 'Password expired. Log in again' : 'Could not save. Try again');
+      render();
+    });
+  }
+
+  /* ---------- rendering ---------- */
+  var CHECK = '<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 7.5l3 3 6-7"/></svg>';
+  var LOCK = '<svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="12" width="18" height="12" rx="3"/><path d="M9 12V9a5 5 0 0 1 10 0v3"/></svg>';
+  var OPEN = '<svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="12" width="18" height="12" rx="3"/><path d="M9 12V9a5 5 0 0 1 9.5-2"/></svg>';
+
+  function renderPager() {
+    var n = state.quests.length;
+    if (!n) { posText.textContent = ''; dotsEl.innerHTML = ''; prev.disabled = true; next.disabled = true; return; }
+    posText.textContent = 'Quest ' + (state.i + 1) + ' of ' + n;
+    prev.disabled = state.i === 0;
+    next.disabled = state.i === n - 1;
+    dotsEl.innerHTML = state.quests.map(function (q, k) {
+      return '<span class="dot' + (k === state.i ? ' here' : '') + (isDone(q) ? ' done' : '') + '"></span>';
+    }).join('');
+  }
+
+  function renderView() {
+    var q = state.quests[state.i];
+    var total = q.steps.length, done = doneCount(q);
+    var unlocked = isDone(q);
+    var segs = q.steps.map(function (s) { return '<span class="seg' + (s.d ? ' on' : '') + '"></span>'; }).join('');
+    var stepsHtml = q.steps.map(function (s, k) {
+      var link = safeLink(s.l);
+      if (link) {
+        var note = notes[state.i + '-' + k];
+        return '<li class="step link' + (s.d ? ' done' : '') + '"><div class="row-step"><div class="step-main">' +
+          '<span class="box' + (s.d ? ' on' : '') + '">' + CHECK + '</span>' +
+          '<div class="step-body"><span class="txt">' + esc(s.t || 'Untitled step') + '</span>' +
+          (s.d ? '' : '<span class="hint">Stay on the link for 3 seconds, then come back.</span>') + '</div></div>' +
+          (s.d ? '<span class="badge">Done</span>' : '<a class="go" data-go="' + k + '" href="' + esc(link) + '" target="_blank" rel="noopener noreferrer">Open link</a>') +
+          '</div>' + (note ? '<p class="note" role="alert">' + esc(note) + '</p>' : '') + '</li>';
+      }
+      return '<li class="step"><label><input type="checkbox" data-k="' + k + '"' + (s.d ? ' checked' : '') + '>' +
+        '<span class="box">' + CHECK + '</span><span class="txt">' + esc(s.t || 'Untitled step') + '</span></label></li>';
+    }).join('');
+    var vault;
+    if (!unlocked) {
+      var left = total - done;
+      vault = '<section class="vault locked" aria-label="Script">' +
+        '<div class="vault-head">' + LOCK + '<div><p class="vault-title">Script locked</p>' +
+        '<p class="vault-sub">' + (total === 0 ? 'This quest has no steps yet.' : left + (left === 1 ? ' step' : ' steps') + ' left to unlock it.') + '</p></div></div>' +
+        '<div class="fake" aria-hidden="true"><i></i><i></i><i></i><i></i></div>' +
+        '<button class="cta" type="button" disabled>Get Script</button></section>';
+    } else {
+      var gl = safeLink(q.g);
+      vault = '<section class="vault open" aria-label="Script">' +
+        '<div class="vault-head">' + OPEN + '<div><p class="vault-title">Script unlocked</p>' +
+        '<p class="vault-sub">Every step is done. The script is yours.</p></div></div>' +
+        (gl
+          ? '<a class="cta" href="' + esc(gl) + '" target="_blank" rel="noopener noreferrer">Get Script</a>'
+          : '<button class="cta" id="getScript" type="button">Get Script</button>' +
+            (revealed[state.i] ? '<pre class="script" tabindex="0">' + esc(q.script) + '</pre>' : '')) +
+        '</section>';
+    }
+    var banner = (isOwner && dirty)
+      ? '<div class="unsaved"><span>You have unsaved changes.</span><button class="btn primary" id="saveBtn" type="button"' + (saving ? ' disabled' : '') + '>' + (saving ? 'Saving...' : 'Save changes') + '</button></div>'
+      : '';
+    stage.innerHTML = banner + '<article class="card"><h2>' + esc(q.title || 'Untitled quest') + '</h2>' +
+      '<div class="progress"><div class="segs">' + segs + '</div><span class="count">' + done + ' of ' + total + ' steps</span></div>' +
+      '<ul class="steps">' + stepsHtml + '</ul>' + vault + '</article>';
+  }
+
+  function renderEdit() {
+    var q = state.quests[state.i];
+    var rows = q.steps.map(function (s, k) {
+      return '<div class="sedit"><div class="row"><input type="text" id="step-' + k + '" data-step="' + k + '" value="' + esc(s.t) + '" aria-label="Step ' + (k + 1) + ' text" placeholder="Step ' + (k + 1) + '">' +
+        '<button class="mini" type="button" data-rm="' + k + '" aria-label="Remove step ' + (k + 1) + '">&times;</button></div>' +
+        '<input type="text" inputmode="url" id="link-' + k + '" data-link="' + k + '" value="' + esc(s.l || '') + '" aria-label="Step ' + (k + 1) + ' link (optional)" placeholder="Link, e.g. https://example.com (optional)"></div>';
+    }).join('');
+    stage.innerHTML = '<article class="card edit"><div class="field"><span class="lab">Quest title</span>' +
+      '<input type="text" id="qTitle" value="' + esc(q.title) + '"></div>' +
+      '<div class="field"><span class="legend">Steps</span>' + rows +
+      '<span class="hint">Up to 2 steps. A step with a link only completes after the visitor stays on the link for 3 seconds.</span>' +
+      (q.steps.length < 2 ? '<div class="btns"><button class="btn" id="addStep" type="button">Add step</button></div>' : '') + '</div>' +
+      '<div class="field"><span class="lab">Get Script link (optional)</span>' +
+      '<input type="text" inputmode="url" id="qGetLink" value="' + esc(q.g || '') + '" placeholder="https://example.com/your-script">' +
+      '<span class="hint">When set, Get Script opens this link after every step is done.</span></div>' +
+      '<div class="field"><span class="lab">Link for this quest</span>' +
+      '<input type="text" id="qLinkShow" readonly value="' + esc(questLongLink(q)) + '">' +
+      '<span class="hint">Share this to show just this quest. It never changes, even when you add more quests.</span></div>' +
+      '<div class="field"><span class="lab">Short link for this quest (optional)</span>' +
+      '<input type="text" inputmode="url" id="qShort" value="' + esc(q.short || '') + '" placeholder="https://tinyurl.com/your-link">' +
+      '<span class="hint">If you shorten the link above, paste the short one here. Copy Link then copies it.</span></div>' +
+      '<div class="field"><span class="lab">Script text (used when there is no link)</span>' +
+      '<textarea id="qScript" spellcheck="false"></textarea></div>' +
+      '<div class="btns"><button class="btn primary" id="saveBtn" type="button"' + (saving ? ' disabled' : '') + '>' + (saving ? 'Saving...' : 'Save changes') + '</button>' +
+      '<button class="btn" id="doneEdit" type="button">Done editing</button></div>' +
+      '<div class="btns"><button class="btn" id="resetSteps" type="button">Reset my progress</button>' +
+      '<button class="btn" id="copyContent" type="button">Copy content</button>' +
+      '<button class="btn danger' + (armedDelete ? ' arm' : '') + '" id="delQuest" type="button">' + (armedDelete ? 'Tap again to delete' : 'Delete quest') + '</button></div></article>';
+    $('qScript').value = q.script;
+  }
+
+  function renderLogin() {
+    stage.innerHTML = '<article class="card"><form id="loginForm" class="edit" autocomplete="off">' +
+      '<div class="field"><label class="lab" for="pw">Owner password</label>' +
+      '<input type="password" id="pw" autocomplete="current-password"></div>' +
+      '<div class="btns"><button class="btn primary" id="loginBtn" type="submit"' + (loginBusy ? ' disabled' : '') + '>' + (loginBusy ? 'Checking...' : 'Log in') + '</button>' +
+      '<button class="btn" id="loginCancel" type="button">Cancel</button></div></form></article>';
+    var f = $('pw'); if (f) f.focus();
+  }
+
+  function render() {
+    editBtn.hidden = !(adminHash || isOwner);
+    addBtn.hidden = !isOwner;
+    if (!isOwner && status === 'ready') {
+      var hi = hashIndex();
+      state.i = hi >= 0 ? hi : 0;
+    }
+    $('pagerNav').hidden = !isOwner;
+    $('lead').textContent = isOwner
+      ? 'Every quest is its own page. Complete both steps to unlock the script, then use the arrows to move to the next quest.'
+      : 'Complete both steps to unlock the script.';
+    renderPager();
+    if (status === 'loading') {
+      stage.innerHTML = '<article class="card"><p class="muted">Loading quests...</p></article>';
+    } else if (status === 'failed') {
+      stage.innerHTML = '<article class="card"><p class="muted">The quests could not load. Refresh the page to try again.</p></article>';
+    } else if (loginOpen && !isOwner) {
+      renderLogin();
+    } else if (editing && isOwner) {
+      renderEdit();
+    } else {
+      renderView();
+    }
+    editBtn.setAttribute('aria-pressed', editing ? 'true' : 'false');
+    editBtn.textContent = !isOwner ? 'Owner login' : (editing ? 'Done' : 'Edit');
+  }
+
+  function go(k) {
+    if (status !== 'ready' || k < 0 || k >= state.quests.length) return;
+    state.i = k; armedDelete = false; notes = {}; pending = null; saveProgress(); render();
+    window.scrollTo(0, 0);
+  }
+  function leaveEdit() { editing = false; armedDelete = false; normalizeQuests(); render(); }
+
+  /* ---------- events ---------- */
+  prev.addEventListener('click', function () { go(state.i - 1); });
+  next.addEventListener('click', function () { go(state.i + 1); });
+  addBtn.addEventListener('click', function () {
+    if (status !== 'ready') return;
+    state.quests.push(blankQuest());
+    state.i = state.quests.length - 1;
+    editing = true; dirty = true; armedDelete = false; saveProgress(); render();
+    var t = $('qTitle'); if (t) { t.focus(); t.select(); }
+  });
+  editBtn.addEventListener('click', function () {
+    if (status !== 'ready') return;
+    if (!isOwner) { loginOpen = true; render(); return; }
+    if (editing) leaveEdit(); else { editing = true; armedDelete = false; render(); }
+  });
+  window.addEventListener('hashchange', function () {
+    adminHash = (location.hash === '#admin');
+    if (!adminHash && !isOwner) loginOpen = false;
+    var h = hashIndex();
+    if (status === 'ready' && h >= 0) state.i = h;
+    render();
+  });
+  stage.addEventListener('submit', function (e) {
+    if (!e.target || e.target.id !== 'loginForm') return;
+    e.preventDefault();
+    var pw = ($('pw') || {}).value;
+    if (!pw || loginBusy) return;
+    loginBusy = true; render();
+    verify(pw).then(function (ok) {
+      loginBusy = false;
+      if (ok) { loginOpen = false; toast('Logged in'); } else { toast('Wrong password'); }
+      render();
+    });
+  });
+  $('copyLink').addEventListener('click', function () {
+    copy(questLink(state.quests[state.i]), function () { toast('Link copied'); }, function () { toast('Copy the link from the address bar'); });
+  });
+
+  stage.addEventListener('change', function (e) {
+    var t = e.target;
+    if (t && t.matches && t.matches('input[type="checkbox"][data-k]')) {
+      var q = state.quests[state.i];
+      var k = t.getAttribute('data-k');
+      q.steps[+k].d = t.checked;
+      if (!isDone(q)) delete revealed[state.i];
+      saveProgress();
+      render();
+      var again = stage.querySelector('input[data-k="' + k + '"]');
+      if (again) again.focus();
+      if (isDone(q)) toast('Script unlocked');
+    }
+  });
+
+  stage.addEventListener('input', function (e) {
+    if (!editing || !isOwner) return;
+    var t = e.target, q = state.quests[state.i];
+    if (t.id === 'qTitle') q.title = t.value;
+    else if (t.id === 'qScript') q.script = t.value;
+    else if (t.id === 'qGetLink') q.g = t.value;
+    else if (t.id === 'qShort') q.short = t.value;
+    else if (t.hasAttribute('data-step')) q.steps[+t.getAttribute('data-step')].t = t.value;
+    else if (t.hasAttribute('data-link')) q.steps[+t.getAttribute('data-link')].l = t.value;
+    else return;
+    dirty = true;
+  });
+
+  stage.addEventListener('click', function (e) {
+    var t = e.target.closest ? e.target.closest('button') : null;
+    if (!t || status !== 'ready') return;
+    var q = state.quests[state.i];
+    if (t.id === 'getScript') {
+      revealed[state.i] = true;
+      render();
+      copy(q.script, function () { toast('Script copied'); }, function () { toast('Select the script below to copy it'); });
+      var btn = $('getScript'); if (btn) btn.focus();
+      return;
+    }
+    if (t.id === 'loginCancel') { loginOpen = false; render(); return; }
+    if (!isOwner) return;
+    if (t.id === 'saveBtn') {
+      saveContent();
+    } else if (t.id === 'addStep') {
+      q.steps.push({ t: '', l: '', d: false }); dirty = true; render();
+      var f = $('step-' + (q.steps.length - 1)); if (f) f.focus();
+    } else if (t.hasAttribute('data-rm')) {
+      q.steps.splice(+t.getAttribute('data-rm'), 1); delete revealed[state.i]; dirty = true; render();
+    } else if (t.id === 'doneEdit') {
+      leaveEdit();
+    } else if (t.id === 'resetSteps') {
+      q.steps.forEach(function (s) { s.d = false; }); delete revealed[state.i]; saveProgress(); toast('Your progress was reset');
+    } else if (t.id === 'copyContent') {
+      copy(exportJson(), function () { toast('Content copied'); }, function () { toast('Could not copy'); });
+    } else if (t.id === 'delQuest') {
+      if (!armedDelete) { armedDelete = true; render(); return; }
+      if (state.quests.length === 1) state.quests = [blankQuest()];
+      else {
+        state.quests.splice(state.i, 1);
+        if (state.i >= state.quests.length) state.i = state.quests.length - 1;
+      }
+      revealed = {}; armedDelete = false; dirty = true; saveProgress(); render(); toast('Quest deleted. Save to publish the change');
+    }
+  });
+
+  /* ---------- link check ---------- */
+  // The visitor opens a link, leaves this page, and comes back. Away for 3 seconds or more completes the step;
+  // a quicker return shows "Action not complete".
+  stage.addEventListener('click', function (e) {
+    var a = e.target.closest ? e.target.closest('a[data-go]') : null;
+    if (!a) return;
+    var k = +a.getAttribute('data-go');
+    pending = { qi: state.i, k: k, at: Date.now(), away: 0 };
+    delete notes[state.i + '-' + k];
+  });
+  function startAway() {
+    if (!pending || pending.away) return;
+    if (Date.now() - pending.at > 2500) return;
+    pending.away = Date.now();
+  }
+  function endAway(fallback) {
+    if (!pending) return;
+    if (!pending.away && !fallback) return;
+    // Normally: time spent away from this page. Fallback (the app never reported the visitor leaving): time since the tap.
+    var p = pending, ms = Date.now() - (p.away || p.at);
+    pending = null;
+    var q = state.quests[p.qi];
+    if (!q || p.qi !== state.i || !q.steps[p.k]) return;
+    if (ms >= MIN_MS) {
+      q.steps[p.k].d = true;
+      delete notes[p.qi + '-' + p.k];
+      saveProgress(); render();
+      toast(isDone(q) ? 'Step complete. Script unlocked' : 'Step complete');
+    } else {
+      notes[p.qi + '-' + p.k] = 'Action not complete. Stay on the link for at least 3 seconds, then come back.';
+      render();
+      toast('Action not complete');
+    }
+  }
+  document.addEventListener('visibilitychange', function () { if (document.hidden) startAway(); else endAway(false); });
+  window.addEventListener('blur', startAway);
+  window.addEventListener('focus', function () { endAway(false); });
+  // Some phone apps open links in a sheet or another app without telling this page.
+  // The first touch, click or key press after opening a link counts as coming back.
+  ['pointerdown', 'touchstart', 'keydown'].forEach(function (evt) {
+    document.addEventListener(evt, function () {
+      var p = pending;
+      if (!p || Date.now() - p.at < 600) return;
+      setTimeout(function () { if (pending === p) endAway(true); }, 300);
+    }, { capture: true, passive: true });
+  });
+
+  /* ---------- start ---------- */
+  fetch('/api/content', { cache: 'no-store' })
+    .then(function (r) { if (!r.ok) throw new Error('http'); return r.json(); })
+    .then(function (d) { setContent(d); render(); })
+    .catch(function () { status = 'failed'; render(); });
+
+  // The edit controls only exist for someone who opens the page with #admin and knows the password.
+  // The server checks the password on every save, so visitors cannot change anything.
+  if (adminHash) {
+    try {
+      var saved = sessionStorage.getItem('as-admin');
+      if (saved) verify(saved).then(function () { render(); });
+    } catch (e) {}
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
