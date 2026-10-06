@@ -1,6 +1,34 @@
 <!doctype html>
 <html lang="en">
-<head>
+<head><script>
+(function(){
+  var tapAt=0, hiddenAt=0, syn=false, timer=0;
+  function fire(n){ syn=true; try{ window.dispatchEvent(new Event(n)); }finally{ syn=false; } }
+  document.addEventListener('click',function(e){
+    var a=e.target&&e.target.closest?e.target.closest('a[data-go]'):null;
+    if(a){ tapAt=Date.now(); hiddenAt=0; clearTimeout(timer); }
+  },true);
+  ['blur','focus'].forEach(function(n){
+    window.addEventListener(n,function(e){ if(!syn) e.stopImmediatePropagation(); },true);
+  });
+  document.addEventListener('visibilitychange',function(e){
+    e.stopImmediatePropagation();
+    var now=Date.now();
+    if(document.hidden){
+      if(tapAt && now-tapAt<2500 && !hiddenAt){ hiddenAt=now; fire('blur'); }
+    } else if(hiddenAt){
+      var dur=now-hiddenAt; hiddenAt=0;
+      if(dur>=2500 && dur<3000) timer=setTimeout(function(){ fire('focus'); },3050-dur);
+      else if(dur>=700) fire('focus');
+    }
+  },true);
+  ['pointerdown','touchstart','keydown'].forEach(function(n){
+    document.addEventListener(n,function(e){
+      if(tapAt && !hiddenAt && Date.now()-tapAt<3000) e.stopImmediatePropagation();
+    },true);
+  });
+})();
+   </script> 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Art Scripters</title>
