@@ -77,17 +77,40 @@ export default async (req: Request) => {
   }
 
   if (req.method === "POST") {
-    if (!passwordOk(req.headers.get("x-admin-password"))) {
-      await new Promise((r) => setTimeout(r, 600));
-      return json({ error: "unauthorized" }, 401);
-    }
     let body: any;
     try {
       body = await req.json();
     } catch {
       return json({ error: "bad_json" }, 400);
     }
+
+    // Public: count a view or an unlock (no password needed)
+    if (body?.action === "view" || body?.action === "unlock") {
+      const id = str(body.id, 40);
+      const store = contentStore();
+      const content: any = (await store.get("content", { type: "json" })) ?? DEFAULT_CONTENT;
+      if (!id || !content.quests?.some((q: any) => q.id === id)) {
+        return json({ error: "unknown_quest" }, 404);
+      }
+      const stats: any = (await store.get("stats", { type: "json" })) ?? {};
+      const s = stats[id] ?? { views: 0, unlocks: 0 };
+      if (body.action === "view") s.views = (s.views || 0) + 1;
+      else s.unlocks = (s.unlocks || 0) + 1;
+      stats[id] = s;
+      await store.setJSON("stats", stats);
+      return json({ ok: true });
+    }
+
+    // Everything below needs the admin password
+    if (!passwordOk(req.headers.get("x-admin-password"))) {
+      await new Promise((r) => setTimeout(r, 600));
+      return json({ error: "unauthorized" }, 401);
+    }
     if (body?.action === "check") return json({ ok: true });
+    if (body?.action === "stats") {
+      const stats = (await contentStore().get("stats", { type: "json" })) ?? {};
+      return json({ stats });
+    }
     if (body?.action === "save") {
       const clean = sanitize(body.content);
       if (!clean) return json({ error: "invalid_content" }, 400);
