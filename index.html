@@ -1,5 +1,66 @@
 <!doctype html>
-<html lang="en">
+<html lang="en"><script>
+(function () {
+  var CKEY = 'art-scripters-counted-v1';
+  var counted = {};
+  try { counted = JSON.parse(localStorage.getItem(CKEY) || '{}') || {}; } catch (e) {}
+  function mark(k) {
+    counted[k] = 1;
+    try { localStorage.setItem(CKEY, JSON.stringify(counted)); } catch (e) {}
+  }
+  function adminPw() {
+    try { return sessionStorage.getItem('as-admin') || ''; } catch (e) { return ''; }
+  }
+  function idFrom(qs) {
+    var h = (location.hash || '').slice(1);
+    for (var k = 0; k < qs.length; k++) if (qs[k].id === h) return h;
+    return qs[0] ? qs[0].id : '';
+  }
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+
+  /* ---- visitors: count one view and one unlock per device ---- */
+  var cachedQuests = null;
+  function loadQuests(cb) {
+    if (cachedQuests) return cb(cachedQuests);
+    fetch('/api/content', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { cachedQuests = d.quests || []; cb(cachedQuests); })
+      .catch(function () {});
+  }
+  function ping(action, id) {
+    fetch('/api/content', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: action, id: id })
+    }).catch(function () {});
+  }
+  function check() {
+    if (adminPw() || location.hash === '#admin') return; /* owner is not counted */
+    if (!document.querySelector('article.card')) return;
+    loadQuests(function (qs) {
+      var id = idFrom(qs);
+      if (!id) return;
+      if (!counted['v:' + id]) { mark('v:' + id); ping('view', id); }
+      if (!counted['u:' + id] && document.querySelector('.vault.open')) {
+        mark('u:' + id); ping('unlock', id);
+      }
+    });
+  }
+
+  /* ---- admin only: stats badge ---- */
+  var data = null, open = false, last = 0;
+  function removeBadge() {
+    var b = document.getElementById('as-stats');
+    if (b) b.remove();
+    data = null; last = 0;
+  }
+  function draw() {
+    if (!data) return;
+    var b = document.getElementById('as-
 <head><script>
 (function(){
   var tapAt=0, hiddenAt=0, syn=false, timer=0;
