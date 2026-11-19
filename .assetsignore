@@ -1,0 +1,10 @@
+wrangler.jsonc
+worker.js
+.assetsignore
+functions
+netlify
+netlify.toml
+node_modules
+package.json
+package-lock.json
+.git
