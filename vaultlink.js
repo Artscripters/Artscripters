@@ -1,5 +1,5 @@
 (function () {
-  var VAULT = 'https://artscriptvault.netlify.app';
+  var VAULT = "https://artscriptersvault.artscripters.workers.dev";
   function add() {
     var v = document.querySelector('.vault.open');
     if (!v || v.querySelector('.vault-go')) return;
